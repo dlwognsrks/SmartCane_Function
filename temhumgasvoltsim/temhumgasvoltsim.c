@@ -1,6 +1,3 @@
-//온습도,가스,심장박동,전압 측정하고 이상치 탐지시 진동부저 알림의 아두이노 코드
-
-
 #include <PulseSensorPlayground.h>   // PulseSensorPlayground 라이브러리 포함
 #include <MQUnifiedsensor.h>         // MQ-5 가스 센서 라이브러리 포함
 #include <DHT.h>                     // DHT11 온습도 센서 라이브러리 포함
@@ -50,7 +47,7 @@ void setup() {
   pulseSensor.setThreshold(Threshold);
   
   if (pulseSensor.begin()) {
-    Serial.println("We created a pulseSensor Object !");
+    Serial.println("We created a pulseSensor Object !");  // 라즈베리파이에 메시지 전송
   }
 
   // DHT11 초기 설정
@@ -97,7 +94,7 @@ void loop() {
     if (pulseSensor.sawStartOfBeat()) {
       bpm = pulseSensor.getBeatsPerMinute();
       Serial.print("BPM: ");
-      Serial.println(bpm);
+      Serial.println(bpm);  // 라즈베리파이에 심박수 전송
     }
 
     // MQ-5 센서 데이터 읽기
