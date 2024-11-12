@@ -1,9 +1,9 @@
-// 온도, 습도, 가스농도, 전압, 심장박동 측정 아두이노 코드 
+//온습도,가스,심장박동,전압 측정하고 이상치 탐지시 진동부저 알림의 아두이노 코드
+
 
 #include <PulseSensorPlayground.h>   // PulseSensorPlayground 라이브러리 포함
 #include <MQUnifiedsensor.h>         // MQ-5 가스 센서 라이브러리 포함
 #include <DHT.h>                     // DHT11 온습도 센서 라이브러리 포함
-#include <DHT_U.h>
 
 // PulseSensor 정의
 const int PulseWire = 2;       // PulseSensor의 보라색 와이어를 아날로그 핀 2에 연결
@@ -33,7 +33,9 @@ DHT dht(DHTPIN, DHTTYPE);
 #define R2 4700.0
 
 unsigned long previousMillis = 0;  // 이전 시간 추적 변수
+unsigned long bpmMillis = 0;       // BPM 측정을 위한 시간 변수
 int seconds = 0;                   // 초 단위 시간 변수
+int bpm = 0;                       // BPM 변수
 
 void setup() {
   Serial.begin(9600);  // 시리얼 모니터 시작
@@ -84,71 +86,57 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
+  unsigned long currentMillis = millis();  // 현재 시간
 
-  // 1초마다 seconds 증가
+  // 1초마다 데이터를 측정하고 출력
   if (currentMillis - previousMillis >= 1000) {
-    previousMillis = currentMillis;
-    seconds++;
-  }
+    previousMillis = currentMillis;  // 이전 시간 업데이트
+    seconds++;  // 초 단위로 증가
 
-  // 심박수 읽기
-  if (pulseSensor.sawStartOfBeat()) {
-    int myBPM = pulseSensor.getBeatsPerMinute();
-    Serial.print("BPM:");
-    Serial.print(myBPM);
+    // 심박수 측정
+    if (pulseSensor.sawStartOfBeat()) {
+      bpm = pulseSensor.getBeatsPerMinute();
+      Serial.print("BPM: ");
+      Serial.println(bpm);
+    }
+
+    // MQ-5 센서 데이터 읽기
+    MQ5.update();
+    float ppm = MQ5.readSensor();
+    Serial.print("ppm: ");
+    Serial.print(ppm);
     Serial.print(", ");
     
-    // 심박수 조건 확인 (40bpm 이하 또는 120bpm 이상)
-    if (myBPM < 40 || myBPM > 120) {
-      delay(10000); // 10초 동안 조건 확인
-      if (myBPM < 40 || myBPM > 120) {
-        digitalWrite(VIBRATION_PIN, HIGH); // 진동 모듈 켜기
-      }
+    // DHT11 온습도 데이터 읽기
+    float temp = dht.readTemperature();
+    float humi = dht.readHumidity();
+    
+    if (isnan(humi) || isnan(temp)) {
+      Serial.println("Failed to read from DHT sensor!");
+    } else {
+      Serial.print("temp: ");
+      Serial.print(temp);
+      Serial.print(", humi: ");
+      Serial.print(humi);
+      Serial.print(", ");
     }
-  }
-  
-  // MQ-5 센서 데이터 읽기
-  MQ5.update();
-  float ppm = MQ5.readSensor();
-  Serial.print("ppm:");
-  Serial.print(ppm);
-  Serial.print(", ");
-  
-  // DHT11 온습도 데이터 읽기
-  float temp = dht.readTemperature();
-  float humi = dht.readHumidity();
-  
-  if (isnan(humi) || isnan(temp)) {
-    Serial.println("Failed to read from DHT sensor!");
-    delay(1000);
-    return;
-  }
-  
-  Serial.print("temp:");
-  Serial.print(temp);
-  Serial.print(", humi:");
-  Serial.print(humi);
-  Serial.print(", ");
-  
-  // 전압 측정
-  int data = analogRead(A1); // A1 핀에서 아날로그 값 읽기
-  float volt = (5 * data / 1024.0) / (R2 / (R1 + R2));
-  Serial.print("volt:");
-  Serial.print(volt);
-  Serial.print(", ");
+    
+    // 전압 측정
+    int data = analogRead(A1); // A1 핀에서 아날로그 값 읽기
+    float volt = (5 * data / 1024.0) / (R2 / (R1 + R2));
+    Serial.print("volt: ");
+    Serial.print(volt);
+    Serial.print(", ");
 
-  // 조건 확인 및 진동 모듈 활성화
-  if (temp > 60 || ppm > 1000 || humi > 85 || volt > 4.3 || volt < 2.5) {
-    digitalWrite(VIBRATION_PIN, HIGH); // 진동 모듈 켜기
-  } else {
-    digitalWrite(VIBRATION_PIN, LOW); // 진동 모듈 끄기
+    // 진동 모듈 켜기/끄기
+    if (temp > 60 || ppm > 1000 || humi > 85 || volt > 4.3 || volt < 2.5) {
+      digitalWrite(VIBRATION_PIN, HIGH); // 진동 모듈 켜기
+    } else {
+      digitalWrite(VIBRATION_PIN, LOW); // 진동 모듈 끄기
+    }
+
+    // 초 단위 시간 출력
+    Serial.print("time: ");
+    Serial.println(seconds);
   }
-
-  // 초 단위 시간 출력
-  Serial.print("time:");
-  Serial.println(seconds);
-
-  // 샘플링 간격
-  delay(1000); // 1초 간격으로 데이터 읽기
 }
